@@ -515,7 +515,7 @@
                 <!-- Визуализация показателей -->
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <!-- Панель показателей выбранной сущности -->
-                    <div class="bg-white rounded-lg shadow-lg p-6" v-if="selectedEntity">
+                    <div class="bg-white rounded-lg shadow-lg p-6" v-if="selectedEntity && selectedEntity.baseStats">
                         <h3 class="text-xl font-bold mb-4 text-gray-800 flex items-center">
                             <i class="fas fa-chart-line mr-2 text-blue-500"></i>
                             Показатели: {{ selectedEntity.name }}
@@ -895,7 +895,7 @@
                         const player = state.simulation.entities.find(e => e.type === 'player');
                         const enemy = state.simulation.entities.find(e => e.type === 'enemy');
                         
-                        if (player && enemy) {
+                        if (player && enemy && player.baseStats && enemy.baseStats) {
                             // Игрок атакует врага
                             const attackAction = state.actions[0]; // Берем первое действие
                             if (attackAction && player.baseStats.energy >= attackAction.cost.energy) {
@@ -968,7 +968,11 @@
                 // Вычисляемые свойства для симуляции
                 const simulationComputed = {
                     selectedEntity() {
-                        return state.simulation.entities.find(e => e.id === state.simulation.selectedEntityId);
+                        if (!state.simulation.selectedEntityId || state.simulation.entities.length === 0) {
+                            return null;
+                        }
+                        const entity = state.simulation.entities.find(e => e.id === state.simulation.selectedEntityId);
+                        return entity || null;
                     },
                     
                     recentLog() {
