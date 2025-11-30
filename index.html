@@ -3,1002 +3,746 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GameDesigner Toolkit</title>
+    <title>Game Design Simulator</title>
     
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     
-    <!-- Font Awesome CDN -->
+    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- Vue 3 CDN -->
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Cytoscape.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
+    
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     
     <style>
-        .fade-enter-active, .fade-leave-active {
-            transition: opacity 0.3s ease;
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8f9fa;
         }
-        .fade-enter-from, .fade-leave-to {
-            opacity: 0;
+        #cy {
+            width: 100%;
+            height: 700px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            background-color: #fff;
         }
-        .stat-bar {
-            transition: all 0.5s ease-in-out;
+        .tab-pane {
+            padding: 15px 0;
+        }
+        .form-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .simulation-controls {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .actor-player { background-color: #4CAF50 !important; }
+        .actor-enemy { background-color: #f44336 !important; }
+        .actor-world { background-color: #2196F3 !important; }
+        .log-container {
+            max-height: 200px;
+            overflow-y: auto;
+            font-size: 0.875rem;
         }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
-    <div id="app" class="container mx-auto px-4 py-8">
-        <!-- Верхняя панель с информацией -->
-        <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
-            <div class="flex flex-col md:flex-row justify-between items-center">
-                <div>
-                    <h1 class="text-3xl font-bold text-gray-800 mb-2">
-                        <i class="fas fa-dragon text-blue-500 mr-3"></i>GameDesigner Toolkit
+<body x-data="gameSimulator()" x-init="init()">
+    <div class="container-fluid py-3">
+        <!-- Заголовок -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h1 class="h3 mb-0">
+                        <i class="fas fa-gamepad me-2"></i>Game Design Simulator
                     </h1>
-                    <p class="text-gray-600">Инструмент для прототипирования и тестирования игровых механик</p>
+                    <div class="badge bg-primary fs-6">
+                        <i class="fas fa-code-branch me-1"></i>v1.0
+                    </div>
                 </div>
-                
-                <div class="flex space-x-6 mt-4 md:mt-0">
-                    <div class="text-center">
-                        <div class="text-2xl font-bold text-blue-600">{{ totalActions }}</div>
-                        <div class="text-sm text-gray-600">Действий</div>
+                <p class="text-muted">Инструмент для проработки механик настольных игр</p>
+            </div>
+        </div>
+
+        <!-- Основной контент -->
+        <div class="row">
+            <!-- Левая панель управления -->
+            <div class="col-lg-4">
+                <div class="card">
+                    <div class="card-header">
+                        <ul class="nav nav-tabs card-header-tabs" id="controlTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="actors-tab" data-bs-toggle="tab" 
+                                        data-bs-target="#actors" type="button" role="tab">
+                                    <i class="fas fa-users me-1"></i>Акторы
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="actions-tab" data-bs-toggle="tab" 
+                                        data-bs-target="#actions" type="button" role="tab">
+                                    <i class="fas fa-bolt me-1"></i>Действия
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="modifiers-tab" data-bs-toggle="tab" 
+                                        data-bs-target="#modifiers" type="button" role="tab">
+                                    <i class="fas fa-magic me-1"></i>Модификаторы
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="simulation-tab" data-bs-toggle="tab" 
+                                        data-bs-target="#simulation" type="button" role="tab">
+                                    <i class="fas fa-play me-1"></i>Симуляция
+                                </button>
+                            </li>
+                        </ul>
                     </div>
-                    <div class="text-center">
-                        <div class="text-2xl font-bold text-purple-600">{{ totalModifiers }}</div>
-                        <div class="text-sm text-gray-600">Модификаторов</div>
-                    </div>
-                    <div class="text-center">
-                        <div :class="state.simulation.isRunning ? 'text-green-600' : 'text-red-600'" 
-                              class="text-2xl font-bold">
-                            {{ simulationStatus }}
+                    <div class="card-body">
+                        <div class="tab-content" id="controlTabsContent">
+                            <!-- Содержимое вкладок (из ЭТАП 3) -->
+                            <div class="tab-pane fade show active" id="actors" role="tabpanel">
+                                <!-- Форма добавления актора -->
+                                <div class="form-section">
+                                    <h6 class="mb-3"><i class="fas fa-plus-circle me-2"></i>Добавить актора</h6>
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-6">
+                                            <input type="text" class="form-control form-control-sm" 
+                                                   x-model="newActor.name" placeholder="Имя актора">
+                                        </div>
+                                        <div class="col-6">
+                                            <select class="form-select form-select-sm" x-model="newActor.type">
+                                                <option value="player">Игрок</option>
+                                                <option value="enemy">Враг</option>
+                                                <option value="world">Мир</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-4">
+                                            <input type="number" class="form-control form-control-sm" 
+                                                   x-model="newActor.health" placeholder="Здоровье">
+                                        </div>
+                                        <div class="col-4">
+                                            <input type="number" class="form-control form-control-sm" 
+                                                   x-model="newActor.energy" placeholder="Энергия">
+                                        </div>
+                                        <div class="col-4">
+                                            <input type="number" class="form-control form-control-sm" 
+                                                   x-model="newActor.attack" placeholder="Атака">
+                                        </div>
+                                    </div>
+                                    <button class="btn btn-primary btn-sm w-100" @click="addActor()">
+                                        <i class="fas fa-plus me-1"></i>Добавить актора
+                                    </button>
+                                </div>
+
+                                <!-- Список акторов -->
+                                <div class="form-section">
+                                    <h6 class="mb-3"><i class="fas fa-list me-2"></i>Список акторов</h6>
+                                    <div class="list-group">
+                                        <template x-for="actor in actors" :key="actor.id">
+                                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <span class="badge" 
+                                                          :class="{
+                                                              'actor-player': actor.type === 'player',
+                                                              'actor-enemy': actor.type === 'enemy',
+                                                              'actor-world': actor.type === 'world'
+                                                          }" x-text="actor.name"></span>
+                                                    <small class="text-muted d-block" 
+                                                           x-text="`HP: ${actor.currentStats.health} | EN: ${actor.currentStats.energy}`"></small>
+                                                </div>
+                                                <button class="btn btn-sm btn-outline-danger" @click="removeActor(actor.id)">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Остальные вкладки аналогично -->
+                            <div class="tab-pane fade" id="actions" role="tabpanel">
+                                <div class="form-section">
+                                    <h6 class="mb-3"><i class="fas fa-plus-circle me-2"></i>Добавить действие</h6>
+                                    <div class="row g-2 mb-2">
+                                        <div class="col-12">
+                                            <input type="text" class="form-control form-control-sm" 
+                                                   x-model="newAction.name" placeholder="Название действия">
+                                        </div>
+                                    </div>
+                                    <div class="row g-2 mb-2">
+                                        <div class="col-6">
+                                            <select class="form-select form-select-sm" x-model="newAction.source">
+                                                <option value="">Источник</option>
+                                                <template x-for="actor in actors" :key="actor.id">
+                                                    <option :value="actor.id" x-text="actor.name"></option>
+                                                </template>
+                                            </select>
+                                        </div>
+                                        <div class="col-6">
+                                            <select class="form-select form-select-sm" x-model="newAction.target">
+                                                <option value="">Цель</option>
+                                                <template x-for="actor in actors" :key="actor.id">
+                                                    <option :value="actor.id" x-text="actor.name"></option>
+                                                </template>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="row g-2 mb-2">
+                                        <div class="col-6">
+                                            <input type="number" class="form-control form-control-sm" 
+                                                   x-model="newAction.cost" placeholder="Стоимость энергии">
+                                        </div>
+                                        <div class="col-6">
+                                            <input type="number" class="form-control form-control-sm" 
+                                                   x-model="newAction.effect" placeholder="Эффект (урон/лечение)">
+                                        </div>
+                                    </div>
+                                    <button class="btn btn-primary btn-sm w-100" @click="addAction()">
+                                        <i class="fas fa-plus me-1"></i>Добавить действие
+                                    </button>
+                                </div>
+
+                                <div class="form-section">
+                                    <h6 class="mb-3"><i class="fas fa-bolt me-2"></i>Список действий</h6>
+                                    <div class="list-group">
+                                        <template x-for="action in actions" :key="action.id">
+                                            <div class="list-group-item">
+                                                <div class="d-flex justify-content-between align-items-start">
+                                                    <div>
+                                                        <strong x-text="action.name"></strong>
+                                                        <small class="text-muted d-block" 
+                                                               x-text="`${getActorName(action.source)} → ${getActorName(action.target)}`"></small>
+                                                        <small class="text-muted" 
+                                                               x-text="`Стоимость: ${action.cost} | Эффект: ${action.effect}`"></small>
+                                                    </div>
+                                                    <button class="btn btn-sm btn-outline-danger" @click="removeAction(action.id)">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="tab-pane fade" id="modifiers" role="tabpanel">
+                                <div class="form-section">
+                                    <h6 class="mb-3"><i class="fas fa-plus-circle me-2"></i>Добавить модификатор</h6>
+                                    <div class="row g-2 mb-2">
+                                        <div class="col-8">
+                                            <input type="text" class="form-control form-control-sm" 
+                                                   x-model="newModifier.name" placeholder="Название модификатора">
+                                        </div>
+                                        <div class="col-4">
+                                            <select class="form-select form-select-sm" x-model="newModifier.type">
+                                                <option value="buff">Бафф</option>
+                                                <option value="debuff">Дебафф</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="row g-2 mb-2">
+                                        <div class="col-6">
+                                            <select class="form-select form-select-sm" x-model="newModifier.target">
+                                                <option value="health">Здоровье</option>
+                                                <option value="energy">Энергия</option>
+                                                <option value="attack">Атака</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-6">
+                                            <input type="number" class="form-control form-control-sm" 
+                                                   x-model="newModifier.value" placeholder="Значение">
+                                        </div>
+                                    </div>
+                                    <div class="row g-2 mb-2">
+                                        <div class="col-12">
+                                            <input type="number" class="form-control form-control-sm" 
+                                                   x-model="newModifier.duration" placeholder="Длительность (ходов)">
+                                        </div>
+                                    </div>
+                                    <button class="btn btn-primary btn-sm w-100" @click="addModifier()">
+                                        <i class="fas fa-plus me-1"></i>Добавить модификатор
+                                    </button>
+                                </div>
+
+                                <div class="form-section">
+                                    <h6 class="mb-3"><i class="fas fa-magic me-2"></i>Список модификаторов</h6>
+                                    <div class="list-group">
+                                        <template x-for="modifier in modifiers" :key="modifier.id">
+                                            <div class="list-group-item">
+                                                <div class="d-flex justify-content-between align-items-start">
+                                                    <div>
+                                                        <span class="badge" 
+                                                              :class="modifier.type === 'buff' ? 'bg-success' : 'bg-danger'"
+                                                              x-text="modifier.name"></span>
+                                                        <small class="text-muted d-block" 
+                                                               x-text="`${modifier.target}: ${modifier.value > 0 ? '+' : ''}${modifier.value}`"></small>
+                                                        <small class="text-muted" x-text="`Длительность: ${modifier.duration} ходов`"></small>
+                                                    </div>
+                                                    <button class="btn btn-sm btn-outline-danger" @click="removeModifier(modifier.id)">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="tab-pane fade" id="simulation" role="tabpanel">
+                                <div class="simulation-controls">
+                                    <h6 class="mb-3"><i class="fas fa-play-circle me-2"></i>Управление симуляцией</h6>
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-4">
+                                            <button class="btn btn-light btn-sm w-100" :disabled="simulationRunning" @click="startSimulation()">
+                                                <i class="fas fa-play me-1"></i>Старт
+                                            </button>
+                                        </div>
+                                        <div class="col-4">
+                                            <button class="btn btn-warning btn-sm w-100" :disabled="!simulationRunning" @click="pauseSimulation()">
+                                                <i class="fas fa-pause me-1"></i>Пауза
+                                            </button>
+                                        </div>
+                                        <div class="col-4">
+                                            <button class="btn btn-danger btn-sm w-100" @click="stopSimulation()">
+                                                <i class="fas fa-stop me-1"></i>Стоп
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="row g-2">
+                                        <div class="col-6">
+                                            <button class="btn btn-info btn-sm w-100" @click="stepSimulation()">
+                                                <i class="fas fa-step-forward me-1"></i>Шаг
+                                            </button>
+                                        </div>
+                                        <div class="col-6">
+                                            <button class="btn btn-secondary btn-sm w-100" @click="resetSimulation()">
+                                                <i class="fas fa-undo me-1"></i>Сброс
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="form-section">
+                                    <h6 class="mb-3"><i class="fas fa-tachometer-alt me-2"></i>Состояние симуляции</h6>
+                                    <div class="mb-2">
+                                        <small class="text-muted">Текущий ход:</small>
+                                        <strong x-text="currentTurn" class="ms-2"></strong>
+                                    </div>
+                                    <div class="mb-2">
+                                        <small class="text-muted">Статус:</small>
+                                        <span class="badge" :class="simulationRunning ? 'bg-success' : 'bg-secondary'" 
+                                              x-text="simulationRunning ? 'Выполняется' : 'Остановлена'" class="ms-2"></span>
+                                    </div>
+                                </div>
+
+                                <div class="form-section">
+                                    <h6 class="mb-3"><i class="fas fa-history me-2"></i>Лог событий</h6>
+                                    <div class="log-container">
+                                        <template x-for="log in simulationLog.slice().reverse().slice(0, 10)" :key="log.id">
+                                            <div class="border-start border-3 ps-2 mb-1" 
+                                                 :class="log.type === 'action' ? 'border-primary' : 'border-info'">
+                                                <small x-text="log.message" class="text-muted"></small>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="text-sm text-gray-600">Симуляция</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Правая панель визуализации -->
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-project-diagram me-2"></i>Игровая модель
+                        </h5>
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-outline-secondary" @click="resetView()">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" @click="exportGraph()">
+                                <i class="fas fa-download"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="cy"></div>
                     </div>
                 </div>
             </div>
         </div>
-
-        <!-- Навигация -->
-        <nav class="bg-white shadow-lg rounded-lg mb-8">
-            <div class="flex space-x-1 p-2">
-                <button 
-                    @click="state.activeTab = 'actions'"
-                    :class="state.activeTab === 'actions' ? 'bg-blue-500 text-white' : 'text-gray-600 hover:bg-gray-100'"
-                    class="px-4 py-2 rounded-md font-medium transition-colors"
-                >
-                    <i class="fas fa-gamepad mr-2"></i>Действия
-                </button>
-                <button 
-                    @click="state.activeTab = 'modifiers'"
-                    :class="state.activeTab === 'modifiers' ? 'bg-blue-500 text-white' : 'text-gray-600 hover:bg-gray-100'"
-                    class="px-4 py-2 rounded-md font-medium transition-colors"
-                >
-                    <i class="fas fa-magic mr-2"></i>Модификаторы
-                </button>
-                <button 
-                    @click="state.activeTab = 'simulation'"
-                    :class="state.activeTab === 'simulation' ? 'bg-blue-500 text-white' : 'text-gray-600 hover:bg-gray-100'"
-                    class="px-4 py-2 rounded-md font-medium transition-colors"
-                >
-                    <i class="fas fa-play mr-2"></i>Симуляция
-                </button>
-            </div>
-        </nav>
-
-        <!-- Контент вкладок -->
-        <transition name="fade" mode="out-in">
-            <!-- Вкладка Действия -->
-            <div v-if="state.activeTab === 'actions'" class="space-y-6">
-                <div class="bg-white rounded-lg shadow-lg p-6">
-                    <h2 class="text-2xl font-bold mb-4 text-gray-800">
-                        <i class="fas fa-plus-circle mr-2 text-green-500"></i>Создать новое действие
-                    </h2>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Название действия</label>
-                            <input 
-                                v-model="state.newAction.name"
-                                type="text" 
-                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholder="Например: Силовая атака"
-                            >
-                        </div>
-                        
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Цель</label>
-                            <select 
-                                v-model="state.newAction.targetType"
-                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            >
-                                <option value="self">На себя</option>
-                                <option value="ally">На союзника</option>
-                                <option value="enemy">На врага</option>
-                                <option value="area">На область</option>
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Описание</label>
-                        <textarea 
-                            v-model="state.newAction.description"
-                            rows="2"
-                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="Описание действия..."
-                        ></textarea>
-                    </div>
-                    
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Стоимость выполнения</label>
-                        <div class="flex items-center space-x-2">
-                            <span class="text-gray-600">Энергия:</span>
-                            <input 
-                                v-model.number="state.newAction.cost.energy"
-                                type="number" 
-                                class="w-20 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                min="0"
-                            >
-                        </div>
-                    </div>
-                    
-                    <div class="mb-4">
-                        <div class="flex justify-between items-center mb-2">
-                            <label class="block text-sm font-medium text-gray-700">Эффекты действия</label>
-                            <button 
-                                @click="addEffectToAction(state.newAction)"
-                                class="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
-                            >
-                                <i class="fas fa-plus mr-1"></i>Добавить эффект
-                            </button>
-                        </div>
-                        
-                        <div v-for="(effect, index) in state.newAction.effects" :key="index" 
-                             class="border border-gray-200 rounded p-3 mb-2 bg-gray-50">
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-2 mb-2">
-                                <select v-model="effect.type" class="px-2 py-1 border rounded">
-                                    <option value="change_stat">Изменение показателя</option>
-                                    <option value="apply_status">Применить статус</option>
-                                </select>
-                                
-                                <select v-model="effect.targetStat" class="px-2 py-1 border rounded">
-                                    <option value="health">Здоровье</option>
-                                    <option value="energy">Энергия</option>
-                                    <option value="damage">Урон</option>
-                                </select>
-                                
-                                <input 
-                                    v-model.number="effect.value"
-                                    type="number" 
-                                    class="px-2 py-1 border rounded"
-                                    placeholder="Значение"
-                                >
-                            </div>
-                            
-                            <div class="flex justify-between items-center">
-                                <input 
-                                    v-model="effect.formula"
-                                    type="text" 
-                                    class="flex-1 px-2 py-1 border rounded mr-2"
-                                    placeholder="Формула (опционально)"
-                                >
-                                <button 
-                                    @click="removeEffectFromAction(state.newAction, index)"
-                                    class="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
-                                >
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <button 
-                        @click="addAction"
-                        :disabled="!state.newAction.name.trim()"
-                        :class="!state.newAction.name.trim() ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600'"
-                        class="w-full py-2 text-white rounded-md transition-colors"
-                    >
-                        <i class="fas fa-save mr-2"></i>Создать действие
-                    </button>
-                </div>
-
-                <!-- Список существующих действий -->
-                <div class="bg-white rounded-lg shadow-lg p-6">
-                    <h3 class="text-xl font-bold mb-4 text-gray-800">Существующие действия</h3>
-                    
-                    <div v-if="state.actions.length === 0" class="text-center py-8 text-gray-500">
-                        <i class="fas fa-inbox text-4xl mb-2"></i>
-                        <p>Действий пока нет</p>
-                    </div>
-                    
-                    <div v-else class="space-y-4">
-                        <div v-for="action in state.actions" :key="action.id" 
-                             class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                            <div class="flex justify-between items-start mb-2">
-                                <h4 class="text-lg font-semibold text-gray-800">{{ action.name }}</h4>
-                                <button 
-                                    @click="removeAction(action.id)"
-                                    class="text-red-500 hover:text-red-700 transition-colors"
-                                >
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
-                            
-                            <p class="text-gray-600 mb-2">{{ action.description }}</p>
-                            
-                            <div class="flex flex-wrap gap-4 text-sm text-gray-700">
-                                <span><i class="fas fa-bullseye mr-1"></i>Цель: {{ 
-                                    action.targetType === 'self' ? 'Себя' :
-                                    action.targetType === 'ally' ? 'Союзник' :
-                                    action.targetType === 'enemy' ? 'Враг' : 'Область'
-                                }}</span>
-                                <span><i class="fas fa-bolt mr-1"></i>Энергия: {{ action.cost.energy }}</span>
-                            </div>
-                            
-                            <div class="mt-3">
-                                <h5 class="font-medium text-gray-700 mb-1">Эффекты:</h5>
-                                <ul class="list-disc list-inside text-sm text-gray-600 space-y-1">
-                                    <li v-for="(effect, index) in action.effects" :key="index">
-                                        {{ 
-                                            effect.type === 'change_stat' ? 
-                                            `Изменяет ${effect.targetStat} на ${effect.value}` :
-                                            `Применяет статус`
-                                        }}
-                                        <span v-if="effect.formula"> ({{ effect.formula }})</span>
-                                    </li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Вкладка Модификаторы -->
-            <div v-else-if="state.activeTab === 'modifiers'" class="space-y-6">
-                <div class="bg-white rounded-lg shadow-lg p-6">
-                    <h2 class="text-2xl font-bold mb-4 text-gray-800">
-                        <i class="fas fa-magic mr-2 text-purple-500"></i>Создать модификатор/статус
-                    </h2>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Название</label>
-                            <input 
-                                v-model="state.newModifier.name"
-                                type="text" 
-                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholder="Например: Усиление атаки"
-                            >
-                        </div>
-                        
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Тип</label>
-                            <select 
-                                v-model="state.newModifier.type"
-                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            >
-                                <option value="buff">Бафф</option>
-                                <option value="debuff">Дебафф</option>
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Описание</label>
-                        <textarea 
-                            v-model="state.newModifier.description"
-                            rows="2"
-                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="Описание модификатора..."
-                        ></textarea>
-                    </div>
-                    
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Длительность (ходов)</label>
-                        <input 
-                            v-model.number="state.newModifier.duration"
-                            type="number" 
-                            min="1"
-                            class="w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                    </div>
-                    
-                    <div class="mb-4">
-                        <div class="flex justify-between items-center mb-2">
-                            <label class="block text-sm font-medium text-gray-700">Эффекты модификатора</label>
-                            <button 
-                                @click="addSubModifier"
-                                class="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
-                            >
-                                <i class="fas fa-plus mr-1"></i>Добавить эффект
-                            </button>
-                        </div>
-                        
-                        <div v-for="(mod, index) in state.newModifier.modifiers" :key="index" 
-                             class="border border-gray-200 rounded p-3 mb-2 bg-gray-50">
-                            <div class="grid grid-cols-1 md:grid-cols-4 gap-2">
-                                <select v-model="mod.targetStat" class="px-2 py-1 border rounded">
-                                    <option value="health">Здоровье</option>
-                                    <option value="energy">Энергия</option>
-                                    <option value="damage">Урон</option>
-                                    <option value="speed">Скорость</option>
-                                </select>
-                                
-                                <select v-model="mod.type" class="px-2 py-1 border rounded">
-                                    <option value="absolute">Абсолютный</option>
-                                    <option value="percentage">Процентный</option>
-                                    <option value="multiplier">Множитель</option>
-                                </select>
-                                
-                                <input 
-                                    v-model.number="mod.value"
-                                    type="number" 
-                                    class="px-2 py-1 border rounded"
-                                    placeholder="Значение"
-                                >
-                                
-                                <select v-model="mod.trigger" class="px-2 py-1 border rounded">
-                                    <option value="always">Всегда</option>
-                                    <option value="turn_start">Начало хода</option>
-                                    <option value="turn_end">Конец хода</option>
-                                    <option value="on_hit">При попадании</option>
-                                </select>
-                            </div>
-                            
-                            <div class="flex justify-end mt-2">
-                                <button 
-                                    @click="removeSubModifier(index)"
-                                    class="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition-colors text-sm"
-                                >
-                                    <i class="fas fa-trash mr-1"></i>Удалить
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <button 
-                        @click="addModifier"
-                        :disabled="!state.newModifier.name.trim()"
-                        :class="!state.newModifier.name.trim() ? 'bg-gray-400 cursor-not-allowed' : 'bg-purple-500 hover:bg-purple-600'"
-                        class="w-full py-2 text-white rounded-md transition-colors"
-                    >
-                        <i class="fas fa-save mr-2"></i>Создать модификатор
-                    </button>
-                </div>
-
-                <!-- Список существующих модификаторов -->
-                <div class="bg-white rounded-lg shadow-lg p-6">
-                    <h3 class="text-xl font-bold mb-4 text-gray-800">Существующие модификаторы</h3>
-                    
-                    <div v-if="state.modifiers.length === 0" class="text-center py-8 text-gray-500">
-                        <i class="fas fa-magic text-4xl mb-2"></i>
-                        <p>Модификаторов пока нет</p>
-                    </div>
-                    
-                    <div v-else class="space-y-4">
-                        <div v-for="modifier in state.modifiers" :key="modifier.id" 
-                             :class="modifier.type === 'buff' ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'"
-                             class="border rounded-lg p-4 hover:shadow-md transition-shadow">
-                            <div class="flex justify-between items-start mb-2">
-                                <div class="flex items-center">
-                                    <h4 class="text-lg font-semibold text-gray-800">{{ modifier.name }}</h4>
-                                    <span :class="modifier.type === 'buff' ? 'bg-green-500' : 'bg-red-500'" 
-                                          class="ml-2 px-2 py-1 text-xs text-white rounded-full">
-                                        {{ modifier.type === 'buff' ? 'БАФФ' : 'ДЕБАФФ' }}
-                                    </span>
-                                </div>
-                                <button 
-                                    @click="removeModifier(modifier.id)"
-                                    class="text-red-500 hover:text-red-700 transition-colors"
-                                >
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
-                            
-                            <p class="text-gray-600 mb-2">{{ modifier.description }}</p>
-                            
-                            <div class="flex flex-wrap gap-4 text-sm text-gray-700 mb-3">
-                                <span><i class="fas fa-clock mr-1"></i>Длительность: {{ modifier.duration }} ходов</span>
-                            </div>
-                            
-                            <div>
-                                <h5 class="font-medium text-gray-700 mb-1">Эффекты:</h5>
-                                <ul class="list-disc list-inside text-sm text-gray-600 space-y-1">
-                                    <li v-for="(mod, index) in modifier.modifiers" :key="index">
-                                        {{ 
-                                            mod.type === 'absolute' ? `+${mod.value} к ${mod.targetStat}` :
-                                            mod.type === 'percentage' ? `+${mod.value}% к ${mod.targetStat}` :
-                                            `x${mod.value} к ${mod.targetStat}`
-                                        }}
-                                        <span class="text-xs text-gray-500">({{ mod.trigger }})</span>
-                                    </li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Вкладка Симуляция -->
-            <div v-else-if="state.activeTab === 'simulation'" class="space-y-6">
-                <!-- Панель управления симуляцией -->
-                <div class="bg-white rounded-lg shadow-lg p-6">
-                    <div class="flex flex-col md:flex-row justify-between items-center mb-6">
-                        <h2 class="text-2xl font-bold text-gray-800 mb-4 md:mb-0">
-                            <i class="fas fa-play-circle mr-2 text-green-500"></i>Тестирование игры
-                        </h2>
-                        
-                        <div class="flex space-x-4">
-                            <div class="flex items-center space-x-2">
-                                <span class="text-sm text-gray-600">Скорость:</span>
-                                <select 
-                                    @change="changeSpeed(Number($event.target.value))"
-                                    :disabled="state.simulation.isRunning"
-                                    class="px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                >
-                                    <option value="2000">Медленно</option>
-                                    <option value="1000" selected>Нормально</option>
-                                    <option value="500">Быстро</option>
-                                    <option value="100">Очень быстро</option>
-                                </select>
-                            </div>
-                            
-                            <button 
-                                @click="startSimulation"
-                                v-if="!state.simulation.isRunning"
-                                class="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-medium"
-                            >
-                                <i class="fas fa-play mr-2"></i>Запустить симуляцию
-                            </button>
-                            
-                            <button 
-                                @click="stopSimulation"
-                                v-else
-                                class="px-6 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-medium"
-                            >
-                                <i class="fas fa-stop mr-2"></i>Остановить
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <!-- Информация о симуляции -->
-                        <div class="bg-gray-50 rounded-lg p-4">
-                            <h3 class="font-semibold text-gray-700 mb-2">Информация</h3>
-                            <div class="space-y-2 text-sm">
-                                <div class="flex justify-between">
-                                    <span class="text-gray-600">Статус:</span>
-                                    <span :class="state.simulation.isRunning ? 'text-green-600' : 'text-red-600'" class="font-medium">
-                                        {{ state.simulation.isRunning ? 'Запущена' : 'Остановлена' }}
-                                    </span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-gray-600">Текущий ход:</span>
-                                    <span class="font-medium">{{ state.simulation.currentTurn }}</span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-gray-600">Скорость:</span>
-                                    <span class="font-medium">{{ 1000 / state.simulation.speed }} ход/сек</span>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Выбор сущности для отслеживания -->
-                        <div class="bg-gray-50 rounded-lg p-4">
-                            <h3 class="font-semibold text-gray-700 mb-2">Отслеживание сущности</h3>
-                            <select 
-                                @change="selectEntity(Number($event.target.value))"
-                                class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            >
-                                <option value="">Выберите сущность...</option>
-                                <option v-for="entity in state.simulation.entities" :key="entity.id" :value="entity.id">
-                                    {{ entity.name }}
-                                </option>
-                            </select>
-                        </div>
-                        
-                        <!-- Быстрые действия -->
-                        <div class="bg-gray-50 rounded-lg p-4">
-                            <h3 class="font-semibold text-gray-700 mb-2">Быстрые действия</h3>
-                            <div class="space-y-2">
-                                <button 
-                                    @click="state.simulation.log = []"
-                                    class="w-full px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors text-sm"
-                                >
-                                    <i class="fas fa-broom mr-1"></i>Очистить лог
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Визуализация показателей -->
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <!-- Панель показателей выбранной сущности -->
-                    <div class="bg-white rounded-lg shadow-lg p-6" v-if="selectedEntity && selectedEntity.baseStats">
-                        <h3 class="text-xl font-bold mb-4 text-gray-800 flex items-center">
-                            <i class="fas fa-chart-line mr-2 text-blue-500"></i>
-                            Показатели: {{ selectedEntity.name }}
-                        </h3>
-                        
-                        <div class="space-y-4">
-                            <!-- Здоровье -->
-                            <div>
-                                <div class="flex justify-between text-sm text-gray-600 mb-1">
-                                    <span>Здоровье</span>
-                                    <span>{{ Math.max(0, selectedEntity.baseStats.health) }} / {{ selectedEntity.baseStats.maxHealth }}</span>
-                                </div>
-                                <div class="w-full bg-gray-200 rounded-full h-4">
-                                    <div 
-                                        class="stat-bar bg-red-500 h-4 rounded-full transition-all duration-500"
-                                        :style="{ width: `${(Math.max(0, selectedEntity.baseStats.health) / selectedEntity.baseStats.maxHealth) * 100}%` }"
-                                    ></div>
-                                </div>
-                            </div>
-                            
-                            <!-- Энергия -->
-                            <div>
-                                <div class="flex justify-between text-sm text-gray-600 mb-1">
-                                    <span>Энергия</span>
-                                    <span>{{ selectedEntity.baseStats.energy }} / {{ selectedEntity.baseStats.maxEnergy }}</span>
-                                </div>
-                                <div class="w-full bg-gray-200 rounded-full h-4">
-                                    <div 
-                                        class="stat-bar bg-blue-500 h-4 rounded-full transition-all duration-500"
-                                        :style="{ width: `${(selectedEntity.baseStats.energy / selectedEntity.baseStats.maxEnergy) * 100}%` }"
-                                    ></div>
-                                </div>
-                            </div>
-                            
-                            <!-- Атрибуты -->
-                            <div class="mt-4">
-                                <h4 class="font-medium text-gray-700 mb-2">Атрибуты</h4>
-                                <div class="grid grid-cols-3 gap-2 text-sm">
-                                    <div class="text-center p-2 bg-gray-50 rounded">
-                                        <div class="font-semibold text-gray-800">{{ selectedEntity.attributes.strength }}</div>
-                                        <div class="text-gray-600 text-xs">Сила</div>
-                                    </div>
-                                    <div class="text-center p-2 bg-gray-50 rounded">
-                                        <div class="font-semibold text-gray-800">{{ selectedEntity.attributes.agility }}</div>
-                                        <div class="text-gray-600 text-xs">Ловкость</div>
-                                    </div>
-                                    <div class="text-center p-2 bg-gray-50 rounded">
-                                        <div class="font-semibold text-gray-800">{{ selectedEntity.attributes.intelligence }}</div>
-                                        <div class="text-gray-600 text-xs">Интеллект</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Лог событий -->
-                    <div class="bg-white rounded-lg shadow-lg p-6">
-                        <h3 class="text-xl font-bold mb-4 text-gray-800 flex items-center">
-                            <i class="fas fa-scroll mr-2 text-yellow-500"></i>
-                            Журнал событий
-                        </h3>
-                        
-                        <div class="bg-gray-50 rounded-lg p-4 h-96 overflow-y-auto">
-                            <div v-if="state.simulation.log.length === 0" class="text-center text-gray-500 py-8">
-                                <i class="fas fa-info-circle text-2xl mb-2"></i>
-                                <p>Событий пока нет</p>
-                            </div>
-                            
-                            <div v-else class="space-y-2">
-                                <div v-for="entry in recentLog" :key="entry.turn + entry.message" 
-                                     :class="{
-                                         'bg-blue-50 border-blue-200': entry.type === 'info',
-                                         'bg-green-50 border-green-200': entry.type === 'action',
-                                         'bg-red-50 border-red-200': entry.type === 'damage',
-                                         'bg-yellow-50 border-yellow-200': entry.type === 'end'
-                                     }"
-                                     class="border-l-4 p-3 rounded-r">
-                                    <div class="flex justify-between text-sm text-gray-500 mb-1">
-                                        <span>Ход {{ entry.turn }}</span>
-                                        <span>{{ new Date().toLocaleTimeString() }}</span>
-                                    </div>
-                                    <p class="text-gray-800">{{ entry.message }}</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Список всех сущностей в симуляции -->
-                <div class="bg-white rounded-lg shadow-lg p-6">
-                    <h3 class="text-xl font-bold mb-4 text-gray-800">Все сущности в симуляции</h3>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <div v-for="entity in state.simulation.entities" :key="entity.id"
-                             @click="selectEntity(entity.id)"
-                             :class="state.simulation.selectedEntityId === entity.id ? 'ring-2 ring-blue-500' : ''"
-                             class="border border-gray-200 rounded-lg p-4 cursor-pointer hover:shadow-md transition-all">
-                            <h4 class="font-semibold text-gray-800 mb-2">{{ entity.name }}</h4>
-                            
-                            <div class="space-y-2 text-sm">
-                                <div>
-                                    <span class="text-gray-600">Здоровье: </span>
-                                    <span :class="entity.baseStats.health <= 0 ? 'text-red-600 font-bold' : 'text-gray-800'">
-                                        {{ Math.max(0, entity.baseStats.health) }}
-                                    </span>
-                                </div>
-                                <div>
-                                    <span class="text-gray-600">Энергия: </span>
-                                    <span class="text-gray-800">{{ entity.baseStats.energy }}</span>
-                                </div>
-                                <div>
-                                    <span class="text-gray-600">Тип: </span>
-                                    <span class="text-gray-800">{{ entity.type === 'player' ? 'Игрок' : 'Враг' }}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </transition>
     </div>
 
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
     <script>
-        const { createApp, ref, reactive, computed, watch } = Vue;
+        // Код из ЭТАП 4, 5, 6
+        function initCy() {
+            return cytoscape({
+                container: document.getElementById('cy'),
+                elements: [],
+                style: [
+                    {
+                        selector: 'node',
+                        style: {
+                            'background-color': '#4CAF50',
+                            'label': 'data(name)',
+                            'width': 60,
+                            'height': 60,
+                            'font-size': '14px',
+                            'color': '#fff',
+                            'text-valign': 'center',
+                            'text-halign': 'center'
+                        }
+                    },
+                    {
+                        selector: 'node.actor-player',
+                        style: {
+                            'background-color': '#4CAF50'
+                        }
+                    },
+                    {
+                        selector: 'node.actor-enemy',
+                        style: {
+                            'background-color': '#f44336'
+                        }
+                    },
+                    {
+                        selector: 'node.actor-world',
+                        style: {
+                            'background-color': '#2196F3'
+                        }
+                    },
+                    {
+                        selector: 'edge',
+                        style: {
+                            'width': 3,
+                            'line-color': '#666',
+                            'target-arrow-color': '#666',
+                            'target-arrow-shape': 'triangle',
+                            'curve-style': 'bezier',
+                            'label': 'data(name)',
+                            'font-size': '12px',
+                            'text-rotation': 'autorotate'
+                        }
+                    },
+                    {
+                        selector: 'edge.active',
+                        style: {
+                            'line-color': '#ff9800',
+                            'target-arrow-color': '#ff9800',
+                            'width': 5
+                        }
+                    }
+                ],
+                layout: {
+                    name: 'cose',
+                    idealEdgeLength: 100,
+                    nodeOverlap: 20,
+                    refresh: 20,
+                    fit: true,
+                    padding: 30,
+                    randomize: false,
+                    componentSpacing: 100
+                }
+            });
+        }
 
-        createApp({
-            setup() {
-                // Реактивное состояние приложения
-                const state = reactive({
-                    // Текущая активная вкладка
-                    activeTab: 'actions',
-                    
-                    // Коллекции данных
-                    actions: [
-                        {
-                            id: 1,
-                            name: 'Силовая атака',
-                            description: 'Мощная атака с повышенным уроном',
-                            targetType: 'enemy',
-                            cost: { energy: 15 },
-                            effects: [
-                                { 
-                                    type: 'change_stat', 
-                                    targetStat: 'health', 
-                                    value: -25,
-                                    formula: 'base_damage + strength'
-                                }
-                            ]
-                        }
-                    ],
-                    
-                    modifiers: [
-                        {
-                            id: 1,
-                            name: 'Усиление атаки',
-                            description: 'Увеличивает наносимый урон',
-                            type: 'buff',
-                            duration: 3,
-                            modifiers: [
-                                { targetStat: 'damage', type: 'percentage', value: 20 }
-                            ]
-                        }
-                    ],
-                    
-                    statuses: [
-                        {
-                            id: 1,
-                            name: 'Кровотечение',
-                            description: 'Постепенный урон в течение времени',
-                            type: 'debuff',
-                            duration: 3,
-                            modifiers: [
-                                { 
-                                    targetStat: 'health', 
-                                    type: 'absolute', 
-                                    value: -5, 
-                                    trigger: 'turn_start' 
-                                }
-                            ]
-                        }
-                    ],
-                    
-                    entities: [
-                        {
-                            id: 1,
-                            name: 'Воин',
-                            type: 'player',
-                            attributes: {
-                                strength: 10,
-                                agility: 5,
-                                intelligence: 3
-                            },
-                            baseStats: {
-                                health: 100,
-                                maxHealth: 100,
-                                energy: 50,
-                                maxEnergy: 50,
-                                damage: 15
-                            }
+        function gameSimulator() {
+            return {
+                actors: [],
+                actions: [],
+                modifiers: [],
+                simulationRunning: false,
+                currentTurn: 0,
+                simulationLog: [],
+                simulationInterval: null,
+                newActor: { name: '', type: 'player', health: 100, energy: 50, attack: 10 },
+                newAction: { name: '', source: '', target: '', cost: 0, effect: 0 },
+                newModifier: { name: '', type: 'buff', target: 'health', value: 0, duration: 0 },
+                
+                init() {
+                    this.cy = initCy();
+                    this.updateGraph();
+                    this.addDemoData();
+                },
+                
+                addActor() {
+                    if (!this.newActor.name) return;
+                    const actor = {
+                        id: 'actor_' + Date.now(),
+                        name: this.newActor.name,
+                        type: this.newActor.type,
+                        baseStats: {
+                            health: parseInt(this.newActor.health) || 100,
+                            energy: parseInt(this.newActor.energy) || 50,
+                            attack: parseInt(this.newActor.attack) || 10
                         },
-                        {
-                            id: 2,
-                            name: 'Слайм',
-                            type: 'enemy',
-                            attributes: {
-                                strength: 5,
-                                agility: 3,
-                                intelligence: 1
+                        currentStats: {
+                            health: parseInt(this.newActor.health) || 100,
+                            energy: parseInt(this.newActor.energy) || 50,
+                            attack: parseInt(this.newActor.attack) || 10
+                        }
+                    };
+                    this.actors.push(actor);
+                    this.resetNewActor();
+                    this.updateGraph();
+                    this.addLog('system', `Добавлен актор: ${actor.name}`);
+                },
+                
+                removeActor(actorId) {
+                    this.actors = this.actors.filter(a => a.id !== actorId);
+                    this.actions = this.actions.filter(a => a.source !== actorId && a.target !== actorId);
+                    this.updateGraph();
+                    this.addLog('system', `Удален актор: ${this.getActorName(actorId)}`);
+                },
+                
+                resetNewActor() {
+                    this.newActor = { name: '', type: 'player', health: 100, energy: 50, attack: 10 };
+                },
+                
+                addAction() {
+                    if (!this.newAction.name || !this.newAction.source || !this.newAction.target) return;
+                    const action = {
+                        id: 'action_' + Date.now(),
+                        name: this.newAction.name,
+                        source: this.newAction.source,
+                        target: this.newAction.target,
+                        cost: parseInt(this.newAction.cost) || 0,
+                        effect: parseInt(this.newAction.effect) || 0
+                    };
+                    this.actions.push(action);
+                    this.resetNewAction();
+                    this.updateGraph();
+                    this.addLog('system', `Добавлено действие: ${action.name}`);
+                },
+                
+                removeAction(actionId) {
+                    const action = this.actions.find(a => a.id === actionId);
+                    this.actions = this.actions.filter(a => a.id !== actionId);
+                    this.updateGraph();
+                    this.addLog('system', `Удалено действие: ${action.name}`);
+                },
+                
+                resetNewAction() {
+                    this.newAction = { name: '', source: '', target: '', cost: 0, effect: 0 };
+                },
+                
+                addModifier() {
+                    if (!this.newModifier.name) return;
+                    const modifier = {
+                        id: 'modifier_' + Date.now(),
+                        name: this.newModifier.name,
+                        type: this.newModifier.type,
+                        target: this.newModifier.target,
+                        value: parseInt(this.newModifier.value) || 0,
+                        duration: parseInt(this.newModifier.duration) || 0
+                    };
+                    this.modifiers.push(modifier);
+                    this.resetNewModifier();
+                    this.addLog('system', `Добавлен модификатор: ${modifier.name}`);
+                },
+                
+                removeModifier(modifierId) {
+                    const modifier = this.modifiers.find(m => m.id === modifierId);
+                    this.modifiers = this.modifiers.filter(m => m.id !== modifierId);
+                    this.addLog('system', `Удален модификатор: ${modifier.name}`);
+                },
+                
+                resetNewModifier() {
+                    this.newModifier = { name: '', type: 'buff', target: 'health', value: 0, duration: 0 };
+                },
+                
+                getActorName(actorId) {
+                    const actor = this.actors.find(a => a.id === actorId);
+                    return actor ? actor.name : 'Неизвестно';
+                },
+                
+                addLog(type, message) {
+                    this.simulationLog.push({
+                        id: 'log_' + Date.now(),
+                        type: type,
+                        message: message,
+                        timestamp: new Date()
+                    });
+                },
+                
+                updateGraph() {
+                    const elements = [];
+                    this.actors.forEach(actor => {
+                        elements.push({
+                            data: {
+                                id: actor.id,
+                                name: actor.name,
+                                health: actor.currentStats.health,
+                                energy: actor.currentStats.energy
                             },
-                            baseStats: {
-                                health: 60,
-                                maxHealth: 60,
-                                energy: 30,
-                                maxEnergy: 30,
-                                damage: 8
-                            }
-                        }
-                    ],
-
-                    // Состояние симуляции
-                    simulation: {
-                        isRunning: false,
-                        currentTurn: 0,
-                        speed: 1000, // ms между ходами
-                        intervalId: null,
-                        entities: [],
-                        log: [],
-                        selectedEntityId: null
-                    },
-
-                    // Формы для создания новых элементов
-                    newAction: {
-                        name: '',
-                        description: '',
-                        targetType: 'enemy',
-                        cost: { energy: 0 },
-                        effects: []
-                    },
-                    
-                    newModifier: {
-                        name: '',
-                        description: '',
-                        type: 'buff',
-                        duration: 1,
-                        modifiers: []
-                    }
-                });
-
-                // Методы для работы с действиями
-                const actionMethods = {
-                    addAction() {
-                        if (!state.newAction.name.trim()) return;
-                        
-                        const newAction = {
-                            id: Date.now(),
-                            ...state.newAction,
-                            effects: [...state.newAction.effects]
-                        };
-                        
-                        state.actions.push(newAction);
-                        
-                        // Сброс формы
-                        state.newAction = {
-                            name: '',
-                            description: '',
-                            targetType: 'enemy',
-                            cost: { energy: 0 },
-                            effects: []
-                        };
-                    },
-                    
-                    removeAction(id) {
-                        const index = state.actions.findIndex(action => action.id === id);
-                        if (index !== -1) {
-                            state.actions.splice(index, 1);
-                        }
-                    },
-                    
-                    addEffectToAction(action) {
-                        action.effects.push({
-                            type: 'change_stat',
-                            targetStat: 'health',
-                            value: 0,
-                            formula: ''
+                            classes: `actor-${actor.type}`
                         });
-                    },
-                    
-                    removeEffectFromAction(action, effectIndex) {
-                        action.effects.splice(effectIndex, 1);
-                    }
-                };
-
-                // Методы для работы с модификаторами
-                const modifierMethods = {
-                    addModifier() {
-                        if (!state.newModifier.name.trim()) return;
-                        
-                        const newModifier = {
-                            id: Date.now(),
-                            ...state.newModifier,
-                            modifiers: [...state.newModifier.modifiers]
-                        };
-                        
-                        state.modifiers.push(newModifier);
-                        
-                        // Сброс формы
-                        state.newModifier = {
-                            name: '',
-                            description: '',
-                            type: 'buff',
-                            duration: 1,
-                            modifiers: []
-                        };
-                    },
-                    
-                    removeModifier(id) {
-                        const index = state.modifiers.findIndex(modifier => modifier.id === id);
-                        if (index !== -1) {
-                            state.modifiers.splice(index, 1);
-                        }
-                    },
-                    
-                    addSubModifier() {
-                        state.newModifier.modifiers.push({
-                            targetStat: 'damage',
-                            type: 'absolute',
-                            value: 0,
-                            trigger: 'always'
+                    });
+                    this.actions.forEach(action => {
+                        elements.push({
+                            data: {
+                                id: action.id,
+                                source: action.source,
+                                target: action.target,
+                                name: action.name,
+                                cost: action.cost,
+                                effect: action.effect
+                            }
                         });
-                    },
-                    
-                    removeSubModifier(index) {
-                        state.newModifier.modifiers.splice(index, 1);
-                    }
-                };
-
-                // Методы симуляции
-                const simulationMethods = {
-                    startSimulation() {
-                        // Инициализация симуляции
-                        state.simulation.entities = JSON.parse(JSON.stringify(state.entities));
-                        state.simulation.currentTurn = 0;
-                        state.simulation.log = [];
-                        state.simulation.isRunning = true;
-                        
-                        // Добавляем начальное сообщение в лог
-                        state.simulation.log.push({
-                            turn: 0,
-                            message: 'Симуляция началась!',
-                            type: 'info'
+                    });
+                    this.cy.elements().remove();
+                    this.cy.add(elements);
+                    this.cy.layout({ name: 'cose' }).run();
+                },
+                
+                addDemoData() {
+                    const demoActors = [
+                        { name: 'Игрок', type: 'player', health: 100, energy: 50, attack: 15 },
+                        { name: 'Враг', type: 'enemy', health: 80, energy: 40, attack: 12 },
+                        { name: 'Мир', type: 'world', health: 0, energy: 0, attack: 0 }
+                    ];
+                    demoActors.forEach(actor => {
+                        this.newActor = { ...actor };
+                        this.addActor();
+                    });
+                    setTimeout(() => {
+                        const demoActions = [
+                            { name: 'Атака', source: this.actors[0].id, target: this.actors[1].id, cost: 10, effect: -15 },
+                            { name: 'Защита', source: this.actors[0].id, target: this.actors[0].id, cost: 5, effect: 10 },
+                            { name: 'Контратака', source: this.actors[1].id, target: this.actors[0].id, cost: 8, effect: -12 }
+                        ];
+                        demoActions.forEach(action => {
+                            this.newAction = { ...action };
+                            this.addAction();
                         });
-                        
-                        // Запускаем игровой цикл
-                        state.simulation.intervalId = setInterval(() => {
-                            simulationMethods.processTurn();
-                        }, state.simulation.speed);
-                    },
-                    
-                    stopSimulation() {
-                        state.simulation.isRunning = false;
-                        if (state.simulation.intervalId) {
-                            clearInterval(state.simulation.intervalId);
-                            state.simulation.intervalId = null;
+                    }, 100);
+                },
+                
+                resetView() {
+                    this.cy.fit();
+                    this.cy.center();
+                },
+                
+                exportGraph() {
+                    const png = this.cy.png({ full: true });
+                    const link = document.createElement('a');
+                    link.download = 'game-model.png';
+                    link.href = png;
+                    link.click();
+                },
+                
+                simulationStep() {
+                    if (!this.simulationRunning) return;
+                    this.currentTurn++;
+                    this.addLog('system', `--- Ход ${this.currentTurn} ---`);
+                    this.cy.edges().removeClass('active');
+                    this.actors.forEach(actor => {
+                        if (actor.currentStats.health <= 0) return;
+                        const availableActions = this.actions.filter(action => 
+                            action.source === actor.id && 
+                            actor.currentStats.energy >= action.cost
+                        );
+                        if (availableActions.length > 0) {
+                            const randomAction = availableActions[Math.floor(Math.random() * availableActions.length)];
+                            this.executeAction(randomAction, actor);
                         }
-                        
-                        state.simulation.log.push({
-                            turn: state.simulation.currentTurn,
-                            message: 'Симуляция остановлена',
-                            type: 'info'
-                        });
-                    },
-                    
-                    processTurn() {
-                        state.simulation.currentTurn++;
-                        
-                        // Простой пример игровой логики
-                        const player = state.simulation.entities.find(e => e.type === 'player');
-                        const enemy = state.simulation.entities.find(e => e.type === 'enemy');
-                        
-                        if (player && enemy && player.baseStats && enemy.baseStats) {
-                            // Игрок атакует врага
-                            const attackAction = state.actions[0]; // Берем первое действие
-                            if (attackAction && player.baseStats.energy >= attackAction.cost.energy) {
-                                // Применяем стоимость
-                                player.baseStats.energy -= attackAction.cost.energy;
-                                
-                                // Применяем эффекты
-                                attackAction.effects.forEach(effect => {
-                                    if (effect.type === 'change_stat') {
-                                        enemy.baseStats.health += effect.value;
-                                        state.simulation.log.push({
-                                            turn: state.simulation.currentTurn,
-                                            message: `Игрок атаковал врага! Здоровье врага: ${Math.max(0, enemy.baseStats.health)}`,
-                                            type: 'action'
-                                        });
-                                    }
-                                });
-                            }
-                            
-                            // Враг атакует игрока (простая логика)
-                            if (enemy.baseStats.health > 0) {
-                                player.baseStats.health -= enemy.baseStats.damage;
-                                state.simulation.log.push({
-                                    turn: state.simulation.currentTurn,
-                                    message: `Враг атаковал игрока! Здоровье игрока: ${Math.max(0, player.baseStats.health)}`,
-                                    type: 'damage'
-                                });
-                            }
-                            
-                            // Восстановление энергии
-                            player.baseStats.energy = Math.min(
-                                player.baseStats.maxEnergy, 
-                                player.baseStats.energy + 5
-                            );
-                            
-                            // Проверка условий окончания
-                            if (player.baseStats.health <= 0) {
-                                state.simulation.log.push({
-                                    turn: state.simulation.currentTurn,
-                                    message: 'Игрок побежден! Симуляция завершена.',
-                                    type: 'end'
-                                });
-                                simulationMethods.stopSimulation();
-                            }
-                            
-                            if (enemy.baseStats.health <= 0) {
-                                state.simulation.log.push({
-                                    turn: state.simulation.currentTurn,
-                                    message: 'Враг побежден! Симуляция завершена.',
-                                    type: 'end'
-                                });
-                                simulationMethods.stopSimulation();
-                            }
-                        }
-                    },
-                    
-                    changeSpeed(newSpeed) {
-                        state.simulation.speed = newSpeed;
-                        if (state.simulation.isRunning) {
-                            simulationMethods.stopSimulation();
-                            simulationMethods.startSimulation();
-                        }
-                    },
-                    
-                    selectEntity(entityId) {
-                        state.simulation.selectedEntityId = entityId;
+                    });
+                    this.checkWinConditions();
+                },
+                
+                executeAction(action, sourceActor) {
+                    const targetActor = this.actors.find(a => a.id === action.target);
+                    if (!targetActor) return;
+                    const edge = this.cy.getElementById(action.id);
+                    edge.addClass('active');
+                    sourceActor.currentStats.energy -= action.cost;
+                    if (action.effect < 0) {
+                        targetActor.currentStats.health += action.effect;
+                        if (targetActor.currentStats.health < 0) targetActor.currentStats.health = 0;
+                        this.addLog('action', `${sourceActor.name} атакует ${targetActor.name} на ${-action.effect} урона`);
+                    } else if (action.effect > 0) {
+                        targetActor.currentStats.health += action.effect;
+                        this.addLog('action', `${sourceActor.name} применяет ${action.name} на ${targetActor.name}`);
                     }
-                };
-
-                // Вычисляемые свойства для симуляции
-                const simulationComputed = {
-                    selectedEntity() {
-                        if (!state.simulation.selectedEntityId || state.simulation.entities.length === 0) {
-                            return null;
-                        }
-                        const entity = state.simulation.entities.find(e => e.id === state.simulation.selectedEntityId);
-                        return entity || null;
-                    },
-                    
-                    recentLog() {
-                        return state.simulation.log.slice(-10).reverse();
+                    this.updateGraph();
+                },
+                
+                checkWinConditions() {
+                    const players = this.actors.filter(a => a.type === 'player' && a.currentStats.health > 0);
+                    const enemies = this.actors.filter(a => a.type === 'enemy' && a.currentStats.health > 0);
+                    if (players.length === 0) {
+                        this.addLog('system', '💀 Игра окончена! Все игроки мертвы.');
+                        this.stopSimulation();
+                    } else if (enemies.length === 0) {
+                        this.addLog('system', '🎉 Победа! Все враги побеждены!');
+                        this.stopSimulation();
+                    } else if (this.currentTurn >= 50) {
+                        this.addLog('system', '⏰ Превышен лимит ходов. Симуляция остановлена.');
+                        this.stopSimulation();
                     }
-                };
-
-                // Глобальные вычисляемые свойства
-                const globalComputed = {
-                    totalActions: computed(() => state.actions.length),
-                    totalModifiers: computed(() => state.modifiers.length),
-                    simulationStatus: computed(() => 
-                        state.simulation.isRunning ? 'Запущена' : 'Остановлена'
-                    )
-                };
-
-                return {
-                    state,
-                    ...actionMethods,
-                    ...modifierMethods,
-                    ...simulationMethods,
-                    ...simulationComputed,
-                    ...globalComputed
-                };
-            }
-        }).mount('#app');
+                },
+                
+                startSimulation() {
+                    if (this.simulationRunning) return;
+                    this.simulationRunning = true;
+                    this.addLog('system', 'Симуляция запущена');
+                    this.simulationInterval = setInterval(() => {
+                        this.simulationStep();
+                    }, 2000);
+                },
+                
+                pauseSimulation() {
+                    this.simulationRunning = false;
+                    if (this.simulationInterval) {
+                        clearInterval(this.simulationInterval);
+                    }
+                    this.addLog('system', 'Симуляция на паузе');
+                },
+                
+                stopSimulation() {
+                    this.pauseSimulation();
+                    this.addLog('system', 'Симуляция остановлена');
+                },
+                
+                stepSimulation() {
+                    if (!this.simulationRunning) {
+                        this.simulationStep();
+                    }
+                },
+                
+                resetSimulation() {
+                    this.stopSimulation();
+                    this.currentTurn = 0;
+                    this.actors.forEach(actor => {
+                        actor.currentStats.health = actor.baseStats.health;
+                        actor.currentStats.energy = actor.baseStats.energy;
+                    });
+                    this.simulationLog = [];
+                    this.updateGraph();
+                    this.addLog('system', 'Симуляция сброшена');
+                }
+            };
+        }
     </script>
 </body>
 </html>
